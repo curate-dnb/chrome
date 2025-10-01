@@ -145,3 +145,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 });
+
+chrome.action.onClicked.addListener((tab) => {
+    const dashboardUrl = chrome.runtime.getURL('newtab.html');
+
+    if (tab && tab.url === dashboardUrl) {
+        return;
+    }
+
+    chrome.tabs.create({ url: dashboardUrl });
+});
