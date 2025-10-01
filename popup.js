@@ -35,7 +35,7 @@ async function addSlug(slug){
   if (!slugs.includes(slug)){
     slugs.push(slug); slugs.sort((a,b)=>a.localeCompare(b));
     await setSlugs(slugs);
-    setStatus(`Added “${slug}” from /releases page. Open a new tab and press Refresh.`);
+    setStatus(`Added “${slug}” from /releases page. Open the dashboard from the extension icon and press Refresh.`);
   }else{
     setStatus(`“${slug}” is already in your watchlist.`);
   }
