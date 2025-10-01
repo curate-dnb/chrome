@@ -1,0 +1,16 @@
+[
+  {
+    "id": 9101,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Access-Control-Allow-Origin", "operation": "set", "value": "*" }
+      ]
+    },
+    "condition": {
+      "regexFilter": "^https:\\/\\/(?:www\\.)?(beatport|instagram|soundcloud|twitch|youtube)\\.com\\/.*",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  }
+]

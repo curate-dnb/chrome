@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <title>Curate Watchlist Settings</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body { padding: 20px; max-width: 600px; margin: auto; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; color: var(--muted); }
+    .input { width: 100%; box-sizing: border-box; }
+    h2 { margin-bottom: 20px; }
+    hr { border-color: var(--edge); margin: 25px 0; border-style: solid; border-width: 1px 0 0 0; }
+  </style>
+</head>
+<body>
+  <h2>API Settings</h2>
+
+  <div class="form-group">
+    <label for="token">Discogs Personal Access Token</label>
+    <input type="password" id="token" class="input" placeholder="Enter your Discogs token...">
+  </div>
+
+  <hr>
+
+  <div class="form-group">
+    <label for="todoistToken">Todoist API Token</label>
+    <input type="password" id="todoistToken" class="input" placeholder="Enter your Todoist token...">
+  </div>
+
+  <button id="save" class="btn">Save Tokens</button>
+  <span id="status" class="small" style="margin-left: 10px;"></span>
+
+  <script src="options.js"></script>
+</body>
+</html>

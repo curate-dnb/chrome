@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Curate — Clock & Watchlist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Micro+5&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+  <main class="wrap">
+
+    <section class="clock-wrap" style="margin-top: 20px;">
+      <div class="clock">
+        <span class="h" id="clockH">00</span><span class="sep">:</span><span class="m" id="clockM">00</span><span class="s" id="clockS">00</span>
+      </div>
+    </section>
+    <div class="age">
+      <div class="box">
+        <div class="dec" id="ageDec">0.00000000</div>
+        <div class="label">years</div>
+      </div>
+    </div>
+
+    <section class="section">
+      <h3>Discogs Watchlist</h3>
+
+      <div class="controls">
+        <button class="btn" id="refreshBtn">Refresh from DB</button>
+        <button class="btn" id="manageDbBtn">Manage Database</button>
+        <input id="filterInput" class="input" placeholder="Filter releases..." style="margin-left: auto; min-width: 200px;">
+      </div>
+
+      <div id="results"></div>
+
+      <div class="pager">
+        <button class="btn" id="prevPage">Prev</button>
+        <div id="pageInfo" class="small"></div>
+        <button class="btn" id="nextPage">Next</button>
+      </div>
+    </section>
+
+  </main>
+  <script src="newtab.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Curate Watchlist</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>body{padding:12px;min-width:320px}</style>
+</head>
+<body>
+  <div class="controls">
+    <button class="btn" id="addBtn">Add current Beatport label</button>
+    <span id="status" class="small">Open a Beatport label page (any sub-tab) and click the button.</span>
+  </div>
+  <div class="controls" style="margin-top:10px">
+    <input class="input" id="manualSlug" placeholder="e.g. blackout-music-nl">
+    <button class="btn" id="addManualBtn">Add slug</button>
+  </div>
+  <div class="small">Slug is the part after <code>/label/</code> in the URL.</div>
+  <script src="popup.js"></script>
+</body>
+</html>
