@@ -108,6 +108,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+    else if (request.type === 'ADD_LABEL_TO_QUEUE') {
+        (async () => {
+            try {
+                if (!request.label || !request.label.id || !request.label.name) {
+                    throw new Error('Invalid label payload.');
+                }
+
+                const label = {
+                    id: String(request.label.id),
+                    name: request.label.name.trim(),
+                };
+
+                const storage = await chrome.storage.local.get([QUEUE_KEY, LABELS_KEY]);
+                const queue = storage[QUEUE_KEY] || [];
+                const importedLabels = storage[LABELS_KEY] || [];
+
+                if (queue.some(existing => existing.id === label.id)) {
+                    sendResponse({ success: false, error: 'Label is already in the queue.' });
+                    return;
+                }
+
+                if (importedLabels.some(existing => existing.id === label.id)) {
+                    sendResponse({ success: false, error: 'Label has already been imported.' });
+                    return;
+                }
+
+                const updatedQueue = [...queue, label];
+                await chrome.storage.local.set({ [QUEUE_KEY]: updatedQueue });
+
+                sendResponse({ success: true });
+            } catch (error) {
+                console.error('Failed to add label to queue:', error);
+                sendResponse({ success: false, error: error.message });
+            }
+        })();
+        return true;
+    }
     // ... (other handlers are unchanged)
     else if (request.type === 'PROCESS_LABEL_QUEUE') {
         const tabId = sender.tab.id;
