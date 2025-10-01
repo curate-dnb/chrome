@@ -9,6 +9,7 @@
     .status-box { margin-top: 20px; padding: 15px; border: 1px solid var(--edge); border-radius: 8px; background: var(--panel); min-height: 120px; }
     #progressCount { font-weight: bold; margin-top: 8px; }
     .queue-item { background: var(--panel); border: 1px solid var(--edge); padding: 5px 10px; border-radius: 6px; display: inline-block; margin: 4px; }
+    #importStatus.error { color: #ff7676; }
   </style>
 </head>
 <body>
@@ -19,6 +20,15 @@
     <div id="imported-labels-list" class="label-list">
       <div class="small">Loading...</div>
     </div>
+  </section>
+
+  <section class="section">
+    <h4>Import Cached Releases from CSV</h4>
+    <div class="controls">
+      <input id="csvFileInput" type="file" accept=".csv,text/csv" class="input" />
+      <button class="btn" id="importCsvBtn">Import CSV</button>
+    </div>
+    <div id="importStatus" class="small"></div>
   </section>
 
   <section class="section">
