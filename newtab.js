@@ -1,6 +1,12 @@
 const CACHE_KEY = 'discogs_release_cache_v1';
 const DOB = new Date(1997, 2, 11);
 const PAGE_SIZE = 100;
+const CSV_FALLBACK_PATHS = [
+    'releases.csv',
+    'data/releases.csv',
+    'discogs_watchlist.csv',
+    'data/discogs_watchlist.csv'
+];
 
 /***** STATE *****/
 let state = {
@@ -33,10 +39,275 @@ function tickClockSafe(){try{const d=new Date(),H=$("#clockH"),M=$("#clockM"),S=
 function tickAgeSafe(){try{const years=(Date.now()-DOB)/(365.2425*24*3600*1000),A=$("#ageDec");if(A)A.textContent=years.toFixed(8)}catch{}}
 
 async function loadFromDatabase() {
-  const storage = await chrome.storage.local.get(CACHE_KEY);
-  const cache = storage[CACHE_KEY] || {};
-  state.items = Object.values(cache);
-  renderResults();
+    const storage = await chrome.storage.local.get(CACHE_KEY);
+    let cache = storage[CACHE_KEY];
+
+    if (!cache || Object.keys(cache).length === 0) {
+        cache = await importReleasesFromCsv();
+    }
+
+    state.items = Object.values(cache || {});
+    renderResults();
+}
+
+function stripBom(text) {
+    return text.replace(/^\uFEFF/, '');
+}
+
+function parseCsv(text) {
+    const rows = [];
+    let current = '';
+    let row = [];
+    let inQuotes = false;
+    const input = stripBom(text);
+
+    for (let i = 0; i < input.length; i++) {
+        const char = input[i];
+
+        if (char === '"') {
+            if (inQuotes && input[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+            continue;
+        }
+
+        if (!inQuotes && (char === ',' || char === '\n' || char === '\r')) {
+            row.push(current);
+            current = '';
+
+            if (char === '\n' || char === '\r') {
+                if (char === '\r' && input[i + 1] === '\n') { i++; }
+                if (row.some(cell => cell.trim() !== '')) { rows.push(row); }
+                row = [];
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (current !== '' || row.length) {
+        row.push(current);
+        if (row.some(cell => (cell || '').trim() !== '')) { rows.push(row); }
+    }
+
+    return rows;
+}
+
+function parseCsvRecords(text) {
+    const rows = parseCsv(text);
+    if (!rows.length) return [];
+
+    const headers = rows.shift().map(header => header.trim());
+    const records = [];
+
+    for (const row of rows) {
+        if (!row.some(cell => (cell || '').trim() !== '')) continue;
+
+        const record = {};
+        for (let i = 0; i < headers.length; i++) {
+            record[headers[i]] = row[i] !== undefined ? row[i] : '';
+        }
+        records.push(record);
+    }
+
+    return records;
+}
+
+function pickFirst(map, keys) {
+    for (const key of keys) {
+        if (map[key] !== undefined && map[key] !== null && String(map[key]).trim() !== '') {
+            return map[key];
+        }
+    }
+    return '';
+}
+
+function parseList(value) {
+    if (value === undefined || value === null) return [];
+    if (Array.isArray(value)) return value;
+
+    const str = String(value).trim();
+    if (!str) return [];
+
+    if ((str.startsWith('[') && str.endsWith(']')) || (str.startsWith('{') && str.endsWith('}'))) {
+        try {
+            const parsed = JSON.parse(str);
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed !== null && typeof parsed === 'object') return [parsed];
+        } catch (error) {
+            console.warn('[Curate] Failed to parse JSON list field:', error);
+        }
+    }
+
+    return str.split(/[;|,]/).map(part => part.trim()).filter(Boolean);
+}
+
+function parseArtists(value) {
+    return parseList(value).map(item => {
+        if (typeof item === 'string') {
+            return { name: item };
+        }
+        if (item && typeof item === 'object') {
+            if (item.name) return { name: item.name };
+            const [firstKey] = Object.keys(item);
+            if (firstKey) return { name: String(item[firstKey]) };
+        }
+        return null;
+    }).filter(Boolean);
+}
+
+function parseLabels(value, fallbackCatNo) {
+    const list = parseList(value);
+    if (!list.length) {
+        if (fallbackCatNo) {
+            return [{ name: '', catno: fallbackCatNo }];
+        }
+        return [];
+    }
+
+    return list.map(item => {
+        if (typeof item === 'string') {
+            return { name: item, catno: fallbackCatNo || '' };
+        }
+        if (item && typeof item === 'object') {
+            const name = (item.name || item.label || item.title || '').toString();
+            const catno = (item.catno || item.catalog_number || fallbackCatNo || '').toString();
+            return { name, catno };
+        }
+        return null;
+    }).filter(label => label && (label.name || label.catno));
+}
+
+function parseTracklist(value) {
+    return parseList(value).map(item => {
+        if (typeof item === 'string') {
+            return { title: item };
+        }
+        if (item && typeof item === 'object') {
+            const title = (item.title || item.name || item.track || '').toString();
+            const duration = item.duration ? item.duration.toString() : undefined;
+            return duration ? { title, duration } : { title };
+        }
+        return null;
+    }).filter(Boolean);
+}
+
+function parseFormats(value) {
+    return parseList(value).map(item => {
+        if (typeof item === 'string') {
+            return { name: item, descriptions: [item] };
+        }
+        if (item && typeof item === 'object') {
+            const name = (item.name || item.type || item.format || '').toString();
+            let descriptions = [];
+            if (Array.isArray(item.descriptions)) {
+                descriptions = item.descriptions.map(desc => desc.toString());
+            } else if (item.descriptions) {
+                descriptions = parseList(item.descriptions).map(desc => desc.toString());
+            } else if (name) {
+                descriptions = [name];
+            }
+            return { name, descriptions };
+        }
+        return null;
+    }).filter(Boolean);
+}
+
+function parseYear(value) {
+    const str = String(value || '').trim();
+    if (!str) return '';
+    const numeric = Number(str);
+    return Number.isNaN(numeric) ? str : numeric;
+}
+
+function normalizeStatus(value) {
+    const str = String(value || '').trim().toLowerCase();
+    if (!str) return '';
+    if (str === 'to listen' || str === 'listen' || str === 'listening' || str.includes('todoist')) {
+        return 'to listen';
+    }
+    return str;
+}
+
+function recordToRelease(record) {
+    const lowered = {};
+    for (const [key, value] of Object.entries(record)) {
+        lowered[key.trim().toLowerCase()] = value;
+    }
+
+    const idRaw = pickFirst(lowered, ['id', 'release_id', 'discogs_id', 'discogs release id', 'releaseid']);
+    const releaseId = idRaw !== undefined && idRaw !== null ? String(idRaw).trim() : '';
+    if (!releaseId) return null;
+
+    const titleRaw = pickFirst(lowered, ['title', 'release_title', 'name']);
+    const title = titleRaw ? String(titleRaw).trim() : `Release #${releaseId}`;
+    const year = parseYear(pickFirst(lowered, ['year', 'release_year']));
+    const released = String(pickFirst(lowered, ['released', 'release_date', 'releasedate', 'released on']) || '').trim();
+    const thumb = String(pickFirst(lowered, ['thumb', 'image', 'artwork', 'cover']) || '').trim();
+    const uri = String(pickFirst(lowered, ['uri', 'url', 'release_url', 'discogs_url']) || '').trim();
+    const status = normalizeStatus(pickFirst(lowered, ['status', 'todoist_status', 'state', 'todoist']));
+    const catno = String(pickFirst(lowered, ['catno', 'catalog_number', 'catalogue', 'catalog']) || '').trim();
+    const labelValue = pickFirst(lowered, ['label', 'labels', 'label_name']);
+    const artistValue = pickFirst(lowered, ['artists', 'artist', 'artist_name']);
+    const formatValue = pickFirst(lowered, ['format', 'formats', 'format_description']);
+    const tracklistValue = pickFirst(lowered, ['tracklist', 'tracks', 'track_list']);
+
+    const release = {
+        id: releaseId,
+        title,
+        year,
+        released,
+        thumb,
+        uri,
+        status: status || undefined,
+        labels: parseLabels(labelValue, catno),
+        artists: parseArtists(artistValue),
+        tracklist: parseTracklist(tracklistValue),
+        formats: parseFormats(formatValue)
+    };
+
+    if (!release.labels.length && catno) {
+        release.labels = [{ name: '', catno }];
+    }
+
+    release.artists = Array.isArray(release.artists) ? release.artists : [];
+    release.labels = Array.isArray(release.labels) ? release.labels : [];
+    release.tracklist = Array.isArray(release.tracklist) ? release.tracklist : [];
+    release.formats = Array.isArray(release.formats) ? release.formats : [];
+
+    return release;
+}
+
+async function importReleasesFromCsv() {
+    for (const path of CSV_FALLBACK_PATHS) {
+        try {
+            const url = chrome.runtime.getURL(path);
+            const response = await fetch(url);
+            if (!response.ok) continue;
+
+            const text = await response.text();
+            const records = parseCsvRecords(text);
+            const releases = records.map(recordToRelease).filter(Boolean);
+            if (!releases.length) continue;
+
+            const cache = {};
+            for (const release of releases) {
+                cache[release.id] = release;
+            }
+
+            await chrome.storage.local.set({ [CACHE_KEY]: cache });
+            console.info(`[Curate] Imported ${releases.length} releases from ${path}.`);
+            return cache;
+        } catch (error) {
+            console.warn(`[Curate] Failed to import releases from ${path}:`, error);
+        }
+    }
+
+    return {};
 }
 
 /***** RENDER LOGIC *****/
